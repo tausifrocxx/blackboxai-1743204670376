@@ -336,4 +336,50 @@ router.post('/:id/salary', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * Test endpoint for new Staff model features
+ * @route GET /api/staff/:id/test-new-features
+ * @group Staff - Operations about staff members
+ * @param {string} id.path.required - Staff member ID
+ * @returns {object} 200 - Test data containing new model features
+ * @returns {Error}  404 - Staff not found
+ * @returns {Error}  500 - Server error
+ * @security JWT
+ */
+router.get('/:id/test-new-features', authMiddleware, async (req, res) => {
+  try {
+    const staff = await Staff.findById(req.params.id)
+      .select('+salary.bankDetails +performance.kpis')
+      .lean();
+
+    if (!staff) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Staff not found' 
+      });
+    }
+
+    // Test response with new features
+    const testData = {
+      totalSalary: staff.totalSalary || 0,
+      attendancePercentage: staff.attendancePercentage || 0,
+      department: staff.department || 'Sales',
+      bankDetails: staff.salary?.bankDetails || {},
+      leaveBalance: staff.leaveBalance || {},
+      performanceMetrics: staff.performance?.kpis || []
+    };
+
+    res.json({
+      success: true,
+      data: testData
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Server Error' 
+    });
+  }
+});
+
 module.exports = router;
