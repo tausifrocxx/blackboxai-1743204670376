@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const { Sequelize } = require('sequelize');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 
@@ -15,13 +14,16 @@ app.use(bodyParser.json());
 // Database connection
 async function connectDB() {
   try {
-    const mongod = await MongoMemoryServer.create();
-    const mongoURI = mongod.getUri();
-    console.log('Using in-memory MongoDB at:', mongoURI);
-
-    await mongoose.connect(mongoURI);
-    console.log('MongoDB connected successfully');
-    return mongod;
+    const sequelize = new Sequelize({
+      dialect: 'sqlite',
+      storage: ':memory:',
+      logging: false
+    });
+    
+    await sequelize.authenticate();
+    console.log('SQLite connection established');
+    await sequelize.sync(); // Creates tables if they don't exist
+    return sequelize;
   } catch (err) {
     console.error('Database connection failed:', err);
     process.exit(1);
@@ -34,8 +36,8 @@ async function initializeData() {
     const Bike = require('./models/Bike');
     const Customer = require('./models/Customer');
 
-    await Bike.deleteMany();
-    await Customer.deleteMany();
+    await Bike.destroy({ where: {} });
+    await Customer.destroy({ where: {} });
 
     await Bike.create([
       { 
