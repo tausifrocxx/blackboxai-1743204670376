@@ -11,77 +11,54 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// Database connection
-async function connectDB() {
-  try {
-    const sequelize = new Sequelize({
-      dialect: 'sqlite',
-      storage: ':memory:',
-      logging: false
-    });
-    
-    await sequelize.authenticate();
-    console.log('SQLite connection established');
-    await sequelize.sync(); // Creates tables if they don't exist
-    return sequelize;
-  } catch (err) {
-    console.error('Database connection failed:', err);
-    process.exit(1);
-  }
-}
-
 // Initialize sample data
 async function initializeData() {
   try {
-    const Bike = require('./models/Bike');
-    const Customer = require('./models/Customer');
+    const { Bike, Customer } = require('./db');
 
+
+    // Clear existing data
     await Bike.destroy({ where: {} });
     await Customer.destroy({ where: {} });
 
-    await Bike.create([
+
+    await Bike.bulkCreate([
       { 
         model: 'Mountain Pro', 
         price: 899, 
         inStock: 5,
         variant: 'Standard',
-        specs: {
-          fuelType: 'Petrol',
-          transmission: 'Manual',
-          power: '75 HP',
-          mileage: '25 kmpl',
-          engine: '250cc'
-        }
+        fuelType: 'Petrol',
+        transmission: 'Manual',
+        power: '75 HP',
+        mileage: '25 kmpl',
+        engine: '250cc'
       },
       { 
         model: 'Road Elite', 
         price: 1299, 
         inStock: 3,
         variant: 'Deluxe',
-        specs: {
-          fuelType: 'Petrol',
-          transmission: 'Automatic',
-          power: '100 HP',
-          mileage: '20 kmpl',
-          engine: '350cc'
-        }
+        fuelType: 'Petrol',
+        transmission: 'Automatic',
+        power: '100 HP',
+        mileage: '20 kmpl',
+        engine: '350cc'
       },
       { 
         model: 'Hybrid Comfort', 
         price: 599, 
         inStock: 8,
         variant: 'Eco',
-        specs: {
-          fuelType: 'Hybrid',
-          transmission: 'Automatic',
-          power: '60 HP',
-          mileage: '30 kmpl',
-          engine: '200cc'
-        }
+        fuelType: 'Hybrid',
+        transmission: 'Automatic',
+        power: '60 HP',
+        mileage: '30 kmpl',
+        engine: '200cc'
       }
     ]);
 
-    await Customer.create([
+    await Customer.bulkCreate([
       { name: 'John Doe', email: 'john@example.com', phone: '555-0101' },
       { name: 'Jane Smith', email: 'jane@example.com', phone: '555-0202' }
     ]);
@@ -107,22 +84,38 @@ app.get('/health', (req, res) => {
 
 // Start server
 (async () => {
-  const mongod = await connectDB();
+    // Initialize database through db.js
+  const { sequelize } = await require('./db').syncDB();
   await initializeData();
 
-  const server = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
+
+    let server;
+  const startServer = (port) => {
+    server = app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+    }).on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`Port ${port} is in use, trying port ${port + 1}...`);
+        startServer(port + 1);
+      } else {
+        console.error('Server error:', err);
+        process.exit(1);
+      }
+    });
+  };
+  
+  startServer(PORT);
+
 
   // Graceful shutdown
   process.on('SIGINT', async () => {
-    await mongoose.connection.close();
-    await mongod.stop();
+    await sequelize.close();
     server.close(() => {
       console.log('Server stopped');
       process.exit(0);
     });
   });
 })();
+
 
 module.exports = app;
